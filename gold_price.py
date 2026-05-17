@@ -27,6 +27,14 @@ def save_history(history):
         f.write("\n")
 
 
+def detect_period(hour):
+    if hour < 12:
+        return "morning"
+    if hour < 16:
+        return "afternoon"
+    return "evening"
+
+
 def get_gold_prices(period):
     resp = requests.get(URL, timeout=15)
     resp.raise_for_status()
@@ -103,12 +111,9 @@ def send_whatsapp(message):
 
 def main():
     try:
-        period = (sys.argv[1] if len(sys.argv) > 1 else os.environ.get("SCHEDULE", "morning")).lower()
-        period_name = PERIOD_NAMES.get(period)
-        if not period_name:
-            raise ValueError(f"Invalid schedule: {period}")
-
         now_uae = datetime.now(timezone.utc) + UAE_OFFSET
+        period = detect_period(now_uae.hour)
+        period_name = PERIOD_NAMES[period]
         date_str = now_uae.strftime("%Y-%m-%d")
         read_at = now_uae.isoformat()
 
