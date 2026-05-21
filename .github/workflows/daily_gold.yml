@@ -1,22 +1,58 @@
 name: Daily Gold Price
+
 on:
   schedule:
-    - cron: "45 5 * * 0-4"
-    - cron: "45 5 * * 5-6"
+    - cron: "45 5 * * *"
     - cron: "45 9 * * 0-4"
     - cron: "15 14 * * 0-4"
   workflow_dispatch:
+    inputs:
+      schedule:
+        description: Time slot
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - morning
+          - afternoon
+          - evening
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-gold-price-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: python gold_price.py
+      - name: Choose time slot
+        id: slot
+        shell: bash
+        run: |
+          slot="auto"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            slot="${{ inputs.schedule }}"
+          else
+            case "${{ github.event.schedule }}" in
+              "45 9 * * 0-4") slot="afternoon" ;;
+              "15 14 * * 0-4") slot="evening" ;;
+              *) slot="morning" ;;
+            esac
+          fi
+          echo "slot=$slot" >> "$GITHUB_OUTPUT"
+          echo "Using slot: $slot"
+      - run: python gold_price.py "${{ steps.slot.outputs.slot }}"
         env:
           CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
           CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
@@ -24,5 +60,10 @@ jobs:
           git config user.name "gold-bot"
           git config user.email "gold-bot@users.noreply.github.com"
           git add gold_history.json
-          git diff --quiet && git diff --staged --quiet || git commit -m "chore: update gold history"
-          git push
+          if git diff --cached --quiet; then
+            echo "No history changes to commit"
+            exit 0
+          fi
+          git commit -m "chore: update gold history [${{ steps.slot.outputs.slot }}]"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
