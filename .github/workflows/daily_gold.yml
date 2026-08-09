@@ -57,13 +57,16 @@ jobs:
           CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
           CALLMEBOT_APIKEY: ${{ secrets.CALLMEBOT_APIKEY }}
       - run: |
-          git config user.name "gold-bot"
-          git config user.email "gold-bot@users.noreply.github.com"
+          # Author as the repo owner so scheduled runs register as contributions.
+          # The name and the commit subject both say "bot" / "automated" so the
+          # history stays honest about what produced these commits.
+          git config user.name "gold-bot (automated)"
+          git config user.email "86043055+MudMonster341@users.noreply.github.com"
           git add gold_history.json
           if git diff --cached --quiet; then
             echo "No history changes to commit"
             exit 0
           fi
-          git commit -m "chore: update gold history [${{ steps.slot.outputs.slot }}]"
+          git commit -m "chore(bot): automated gold rate update [${{ steps.slot.outputs.slot }}]"
           git pull --rebase origin "$GITHUB_REF_NAME"
           git push origin "HEAD:$GITHUB_REF_NAME"
