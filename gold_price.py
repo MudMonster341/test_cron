@@ -141,6 +141,15 @@ def send_whatsapp(message):
         timeout=15,
     )
     resp.raise_for_status()
+    # CallMeBot signals failures in the response BODY while still returning a 2xx
+    # status (verified 2026-08-09: a paramless request returns HTTP 201 with
+    # "ERROR: phone parameter is missing"). raise_for_status() therefore cannot
+    # detect a rejected send, which is how this ran green for weeks while
+    # delivering nothing. Inspect the body and fail loudly instead.
+    body = resp.text.strip()
+    print(f"CallMeBot response: {body[:300]}")
+    if "ERROR" in body.upper():
+        raise RuntimeError(f"CallMeBot rejected the send: {body[:300]}")
 
 
 def main():
